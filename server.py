@@ -175,8 +175,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 body = ("data=" + urllib.parse.quote(query)).encode()
                 req = urllib.request.Request(ep, data=body, method="POST", headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "Mozilla/5.0 OkolicaAI/1.0",
-                    "Accept": "application/json",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "Accept-Language": "hr,en;q=0.9",
+                    "Origin": "https://www.openstreetmap.org",
+                    "Referer": "https://www.openstreetmap.org/",
                 })
                 print(f"Overpass trying: {ep}", flush=True)
                 with urllib.request.urlopen(req, timeout=20) as r:
