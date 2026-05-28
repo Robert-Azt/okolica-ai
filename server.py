@@ -159,35 +159,38 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
             "https://overpass.openstreetmap.ru/api/interpreter",
         ]
-        # Try both POST and GET for each endpoint
         last_err = None
         for ep in endpoints:
-            # Try POST first
-            try:
-                body = ("data=" + urllib.parse.quote(query)).encode()
-                req = urllib.request.Request(ep, data=body, method="POST", headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "Mozilla/5.0 OkolicaAI/1.0",
-                    "Accept": "application/json",
-                })
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    self.send_json(json.loads(r.read()))
-                return
-            except Exception as e:
-                last_err = e
-            # Try GET as fallback
-            try:
-                get_url = ep + "?" + urllib.parse.urlencode({"data": query})
-                req = urllib.request.Request(get_url, headers={
-                    "User-Agent": "Mozilla/5.0 OkolicaAI/1.0",
-                    "Accept": "application/json",
-                })
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    self.send_json(json.loads(r.read()))
-                return
-            except Exception as e:
-                last_err = e
-        self.send_json({"error": f"Overpass nedostupan: {last_err}"}, 500)
+            for method in ["POST", "GET"]:
+                try:
+                    if method == "POST":
+                        body = ("data=" + urllib.parse.quote(query)).encode()
+                        req = urllib.request.Request(ep, data=body, method="POST", headers={
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "User-Agent": "Mozilla/5.0 OkolicaAI/1.0",
+                            "Accept": "application/json",
+                        })
+                    else:
+                        get_url = ep + "?" + urllib.parse.urlencode({"data": query})
+                        req = urllib.request.Request(get_url, headers={
+                            "User-Agent": "Mozilla/5.0 OkolicaAI/1.0",
+                            "Accept": "application/json",
+                        })
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        raw = r.read()
+                    # Provjeri je li odgovor JSON (ne HTML)
+                    raw_str = raw.decode("utf-8", errors="replace").strip()
+                    if not raw_str.startswith("{"):
+                        last_err = f"{ep} ({method}) vratio ne-JSON odgovor: {raw_str[:100]}"
+                        print(last_err)
+                        continue
+                    data = json.loads(raw_str)
+                    self.send_json(data)
+                    return
+                except Exception as e:
+                    last_err = f"{ep} ({method}): {e}"
+                    print(f"Overpass fallback: {last_err}")
+        self.send_json({"error": f"Svi Overpass endpointi nedostupni. Zadnja greska: {last_err}"}, 500)
 
     # ── Gemini AI ─────────────────────────────────────────────────
     def _gemini_call(self, messages, max_tokens=2000):
