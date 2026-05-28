@@ -69,9 +69,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length)
+        print(f"POST {self.path} ({length} bytes)", flush=True)
         try:
             payload = json.loads(raw)
-        except Exception:
+        except Exception as e:
+            print(f"JSON parse error: {e}", flush=True)
             self.send_json({"error": "Invalid JSON"}, 400)
             return
 
@@ -85,7 +87,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         }
         handler = routes.get(self.path)
         if handler:
-            handler(payload)
+            try:
+                handler(payload)
+            except Exception as e:
+                import traceback
+                print(f"HANDLER ERROR {self.path}: {traceback.format_exc()}", flush=True)
+                try:
+                    self.send_json({"error": str(e)}, 500)
+                except:
+                    pass
         else:
             self.send_json({"error": "Not found"}, 404)
 
