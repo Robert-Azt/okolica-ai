@@ -155,16 +155,34 @@ class Handler(http.server.BaseHTTPRequestHandler):
             "https://overpass-api.de/api/interpreter",
             "https://lz4.overpass-api.de/api/interpreter",
             "https://z.overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+            "https://overpass.openstreetmap.ru/api/interpreter",
         ]
-        body = ("data=" + urllib.parse.quote(query)).encode()
+        # Try both POST and GET for each endpoint
         last_err = None
         for ep in endpoints:
+            # Try POST first
             try:
+                body = ("data=" + urllib.parse.quote(query)).encode()
                 req = urllib.request.Request(ep, data=body, method="POST", headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "OkolicaAI/1.0"
+                    "User-Agent": "Mozilla/5.0 OkolicaAI/1.0",
+                    "Accept": "application/json",
                 })
-                with urllib.request.urlopen(req, timeout=25) as r:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    self.send_json(json.loads(r.read()))
+                return
+            except Exception as e:
+                last_err = e
+            # Try GET as fallback
+            try:
+                get_url = ep + "?" + urllib.parse.urlencode({"data": query})
+                req = urllib.request.Request(get_url, headers={
+                    "User-Agent": "Mozilla/5.0 OkolicaAI/1.0",
+                    "Accept": "application/json",
+                })
+                with urllib.request.urlopen(req, timeout=30) as r:
                     self.send_json(json.loads(r.read()))
                 return
             except Exception as e:
