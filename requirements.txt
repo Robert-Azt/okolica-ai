@@ -1,0 +1,2 @@
+# Nema vanjskih paketa — koristimo samo Python standard library
+# Ova datoteka je potrebna da Render prepozna Python projekt

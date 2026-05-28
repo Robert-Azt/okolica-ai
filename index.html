@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Okolica.ai</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0e0f11; --surface: #16181c; --surface2: #1e2026;
+  --border: rgba(255,255,255,0.07); --accent: #c8f060;
+  --accent-dim: rgba(200,240,96,0.10); --text: #f0f0ec;
+  --muted: #7a7d85; --muted2: #4a4d55; --r: 14px;
+}
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; min-height: 100vh; padding: 2.5rem 1.5rem; }
+.wrap { max-width: 800px; margin: 0 auto; }
+.logo { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin-bottom: 1rem; }
+h1 { font-family: 'Syne', sans-serif; font-size: clamp(26px,5vw,42px); font-weight: 700; line-height: 1.1; margin-bottom: .6rem; }
+h1 span { color: var(--accent); }
+.lead { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 2rem; }
+
+.search-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 1.25rem; margin-bottom: 1rem; }
+.lbl { font-family: 'Syne', sans-serif; font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--muted); margin-bottom: .5rem; }
+.input-row { display: flex; gap: 10px; position: relative; }
+
+/* Autocomplete */
+.ac-wrap { flex: 1; position: relative; }
+input#addr { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 300; padding: .7rem 1rem; outline: none; transition: border-color .2s; }
+input#addr:focus { border-color: var(--accent); }
+input#addr::placeholder { color: var(--muted2); }
+input#addr.coords-mode { border-color: rgba(200,240,96,0.4); }
+
+.ac-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; z-index: 100; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: none; }
+.ac-dropdown.open { display: block; }
+.ac-item { padding: 10px 14px; font-size: 13px; color: var(--muted); cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; transition: background .15s; }
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover, .ac-item.active { background: rgba(200,240,96,0.07); color: var(--text); }
+.ac-item .ac-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.ac-item .ac-main { color: var(--text); font-weight: 400; }
+.ac-item .ac-sub { font-size: 11px; color: var(--muted2); }
+.ac-loading { padding: 10px 14px; font-size: 13px; color: var(--muted2); display: flex; align-items: center; gap: 8px; }
+.ac-spin { width: 12px; height: 12px; border: 2px solid var(--muted2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+
+.coords-hint { font-size: 11px; color: var(--accent); margin-top: 5px; display: none; }
+.coords-hint.show { display: block; }
+
+button#go { background: var(--accent); border: none; border-radius: 8px; color: #0d0e10; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; padding: .7rem 1.2rem; cursor: pointer; transition: opacity .2s, transform .1s; white-space: nowrap; align-self: flex-start; }
+button#go:hover { opacity: .85; }
+button#go:active { transform: scale(.97); }
+button#go:disabled { opacity: .4; cursor: not-allowed; }
+
+.rad-row { display: flex; align-items: center; gap: 12px; margin-top: .9rem; }
+.rad-row label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+input[type=range] { flex: 1; accent-color: var(--accent); }
+#radVal { font-family: 'Syne', sans-serif; font-size: 13px; color: var(--accent); min-width: 46px; }
+
+#status { font-size: 14px; color: var(--muted); padding: .5rem 0; min-height: 28px; display: flex; align-items: center; gap: 10px; }
+.spin { width: 15px; height: 15px; border: 2px solid var(--muted2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; display: none; flex-shrink: 0; }
+.spin.on { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.err { color: #f07060; }
+
+.compass { display: grid; grid-template-columns: 1fr 2fr 1fr; grid-template-rows: auto auto auto; gap: 6px; margin: 1rem 0; animation: up .4s ease both; }
+@keyframes up { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+.cc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: .9rem 1rem; min-height: 110px; }
+.cc.mid { background: var(--accent-dim); border-color: rgba(200,240,96,.18); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+.cdlbl { font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--accent); margin-bottom: .45rem; text-transform: uppercase; }
+.mid .cdlbl { margin-bottom: 6px; }
+.mid-name { font-size: 12px; color: var(--text); line-height: 1.4; font-weight: 500; }
+.mid-coord { font-size: 10px; color: var(--muted2); margin-top: 3px; }
+ul.pl { list-style: none; }
+ul.pl li { font-size: 12px; color: var(--muted); padding: 2px 0; border-bottom: .5px solid rgba(255,255,255,.04); display: flex; justify-content: space-between; gap: 4px; line-height: 1.35; }
+ul.pl li:last-child { border-bottom: none; }
+.pn { color: var(--text); font-weight: 400; }
+.pt { color: var(--muted2); font-size: 10px; }
+.pd { color: var(--muted2); font-size: 10px; white-space: nowrap; flex-shrink: 0; }
+.pempty { font-size: 11px; color: var(--muted2); font-style: italic; }
+
+.desc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; margin-top: .5rem; animation: up .4s ease .15s both; }
+.desc-hd { padding: .85rem 1.2rem; border-bottom: 1px solid var(--border); font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.desc-bd { padding: 1.2rem; font-size: 15px; line-height: 1.85; font-weight: 300; }
+.desc-bd p { margin-bottom: .55rem; }
+.desc-bd p:last-child { margin-bottom: 0; }
+.pill { display: inline-block; background: var(--accent-dim); border: 1px solid rgba(200,240,96,.2); border-radius: 6px; color: var(--accent); font-size: 12px; padding: 3px 10px; margin-bottom: 1rem; }
+.powered { text-align: center; font-size: 11px; color: var(--muted2); margin-top: 2rem; }
+.powered a { color: var(--muted); text-decoration: none; }
+.powered a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">◆ Okolica.ai</div>
+  <h1>Što se krije<br>oko tvoje <span>adrese?</span></h1>
+  <p class="lead">Upiši adresu ili koordinate — dobit ćeš pregled svih 8 smjerova s objektima u blizini i AI opis kvarta.</p>
+
+  <div class="search-box">
+    <div class="lbl">Adresa ili koordinate</div>
+    <div class="input-row">
+      <div class="ac-wrap">
+        <input type="text" id="addr"
+          placeholder="npr. Ilica 10, Zagreb  ili  45.8144, 15.9780"
+          autocomplete="off" />
+        <div class="ac-dropdown" id="acDrop"></div>
+      </div>
+      <button id="go" onclick="run()">Analiziraj →</button>
+    </div>
+    <div class="coords-hint" id="coordsHint">📍 Koordinate prepoznate — klikni Analiziraj</div>
+    <div class="rad-row">
+      <label>Radijus:</label>
+      <input type="range" id="rad" min="100" max="1000" step="50" value="500"
+             oninput="document.getElementById('radVal').textContent=this.value+'m'">
+      <span id="radVal">500m</span>
+    </div>
+  </div>
+
+  <div id="status"><div class="spin" id="spin"></div><span id="stxt"></span></div>
+  <div id="out"></div>
+  <p class="powered">Podaci: <a href="https://www.openstreetmap.org">OpenStreetMap</a> · <a href="https://overpass-api.de">Overpass API</a> · Claude AI</p>
+</div>
+
+<script>
+// ── Koordinate parser ─────────────────────────────────────────────
+function parseCoords(s) {
+  s = s.trim();
+
+  // Decimalni format: "45.8144, 15.9780" ili "45.8144 15.9780"
+  let m = s.match(/^(-?\d+\.?\d*)\s*[,\s]\s*(-?\d+\.?\d*)$/);
+  if (m) return { lat: +m[1], lon: +m[2] };
+
+  // DMS format: 45°20'39.5"N 14°23'18.5"E  ili  45°20'39.5N 14°23'18.5E
+  const dms = /(\d+)[°d]\s*(\d+)[''']\s*([\d.]+)["""″]?\s*([NS])\s*[\s,]\s*(\d+)[°d]\s*(\d+)[''']\s*([\d.]+)["""″]?\s*([EW])/i;
+  m = s.match(dms);
+  if (m) {
+    let lat = +m[1] + +m[2]/60 + +m[3]/3600;
+    let lon = +m[5] + +m[6]/60 + +m[7]/3600;
+    if (m[4].toUpperCase() === 'S') lat = -lat;
+    if (m[8].toUpperCase() === 'W') lon = -lon;
+    return { lat, lon };
+  }
+
+  return null;
+}
+
+function isCoords(s) { return !!parseCoords(s); }
+
+// ── Autocomplete ──────────────────────────────────────────────────
+let acTimer = null;
+let acResults = [];
+let acIdx = -1;
+let selectedFromAc = false;
+
+const addrInput = document.getElementById('addr');
+const acDrop = document.getElementById('acDrop');
+const coordsHint = document.getElementById('coordsHint');
+
+addrInput.addEventListener('input', () => {
+  const val = addrInput.value.trim();
+  selectedFromAc = false;
+
+  // Provjeri koordinate
+  if (isCoords(val)) {
+    addrInput.classList.add('coords-mode');
+    coordsHint.classList.add('show');
+    closeAc();
+    return;
+  } else {
+    addrInput.classList.remove('coords-mode');
+    coordsHint.classList.remove('show');
+  }
+
+  if (val.length < 3) { closeAc(); return; }
+
+  clearTimeout(acTimer);
+  acTimer = setTimeout(() => fetchSuggestions(val), 350);
+});
+
+addrInput.addEventListener('keydown', (e) => {
+  if (!acDrop.classList.contains('open')) {
+    if (e.key === 'Enter') run();
+    return;
+  }
+  const items = acDrop.querySelectorAll('.ac-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIdx = Math.min(acIdx + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === acIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIdx = Math.max(acIdx - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('active', i === acIdx));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (acIdx >= 0 && acResults[acIdx]) {
+      selectAc(acResults[acIdx]);
+    } else {
+      closeAc(); run();
+    }
+  } else if (e.key === 'Escape') {
+    closeAc();
+  }
+});
+
+addrInput.addEventListener('blur', () => {
+  setTimeout(closeAc, 150);
+});
+
+async function fetchSuggestions(q) {
+  acDrop.innerHTML = '<div class="ac-loading"><div class="ac-spin"></div> Tražim...</div>';
+  acDrop.classList.add('open');
+  acIdx = -1;
+
+  try {
+    const url = `/api/autocomplete`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q })
+    });
+    const data = await resp.json();
+    acResults = data.results || [];
+    renderAc(acResults);
+  } catch(e) {
+    closeAc();
+  }
+}
+
+function renderAc(results) {
+  if (!results.length) { closeAc(); return; }
+  acDrop.innerHTML = results.map((r, i) => `
+    <div class="ac-item" data-idx="${i}" onmousedown="selectAc(acResults[${i}])">
+      <span class="ac-icon">📍</span>
+      <span>
+        <span class="ac-main">${r.display_main}</span><br>
+        <span class="ac-sub">${r.display_sub}</span>
+      </span>
+    </div>
+  `).join('');
+  acDrop.classList.add('open');
+}
+
+function selectAc(r) {
+  addrInput.value = r.display_name;
+  selectedFromAc = true;
+  closeAc();
+  run();
+}
+
+function closeAc() {
+  acDrop.classList.remove('open');
+  acDrop.innerHTML = '';
+  acIdx = -1;
+}
+
+// ── Status ────────────────────────────────────────────────────────
+function setSt(msg, spin) {
+  document.getElementById('stxt').textContent = msg;
+  document.getElementById('spin').classList.toggle('on', !!spin);
+}
+function setErr(msg) {
+  document.getElementById('spin').classList.remove('on');
+  document.getElementById('stxt').innerHTML = `<span class="err">⚠ ${msg}</span>`;
+}
+
+// ── Geo math ──────────────────────────────────────────────────────
+function brng(la1,lo1,la2,lo2){
+  const d=(lo2-lo1)*Math.PI/180;
+  const y=Math.sin(d)*Math.cos(la2*Math.PI/180);
+  const x=Math.cos(la1*Math.PI/180)*Math.sin(la2*Math.PI/180)-Math.sin(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.cos(d);
+  return((Math.atan2(y,x)*180/Math.PI)+360)%360;
+}
+function dst(la1,lo1,la2,lo2){
+  return Math.round(Math.sqrt(Math.pow((la2-la1)*111320,2)+Math.pow((lo2-lo1)*111320*Math.cos(la1*Math.PI/180),2)));
+}
+function sec(b){return['n','ne','e','se','s','sw','w','nw'][Math.round(b/45)%8];}
+
+const TYPES=[
+  [/amenity=restaurant/,'restoran'],[/amenity=cafe/,'kafić'],[/amenity=bar/,'bar'],
+  [/amenity=pub/,'pub'],[/amenity=fast_food/,'brza hrana'],[/amenity=pizza/,'pizzeria'],
+  [/amenity=school/,'škola'],[/amenity=kindergarten/,'vrtić'],[/amenity=university/,'fakultet'],
+  [/amenity=college/,'srednja škola'],[/amenity=library/,'knjižnica'],
+  [/amenity=hospital/,'bolnica'],[/amenity=clinic/,'klinika'],
+  [/amenity=pharmacy/,'ljekarna'],[/amenity=doctors/,'liječnik'],[/amenity=dentist/,'zubar'],
+  [/amenity=bank/,'banka'],[/amenity=atm/,'bankomat'],
+  [/amenity=post_office/,'pošta'],[/amenity=police/,'policija'],
+  [/amenity=fire_station/,'vatrogasci'],[/amenity=embassy/,'ambasada'],
+  [/amenity=place_of_worship/,'crkva'],[/amenity=cinema/,'kino'],
+  [/amenity=theatre/,'kazalište'],[/amenity=arts_centre/,'kulturni centar'],
+  [/amenity=nightclub/,'noćni klub'],[/amenity=marketplace/,'tržnica'],
+  [/amenity=townhall/,'vijećnica'],[/amenity=community_centre/,'dom kulture'],
+  [/amenity=parking/,'parking'],[/amenity=fuel/,'benzinska'],
+  [/amenity=bus_station/,'autobusni kolodvor'],[/highway=bus_stop/,'bus stajalište'],
+  [/amenity=gym/,'teretana'],
+  [/shop=supermarket/,'supermarket'],[/shop=convenience/,'dućan'],[/shop=bakery/,'pekara'],
+  [/shop=butcher/,'mesnica'],[/shop=greengrocer/,'voće i povrće'],[/shop=clothes/,'odjeća'],
+  [/shop=electronics/,'elektronika'],[/shop=hardware/,'željezarija'],
+  [/shop=florist/,'cvjećarnica'],[/shop=hairdresser/,'frizer'],
+  [/shop=optician/,'optika'],[/shop=kiosk/,'kiosk'],
+  [/shop=bookshop/,'knjižara'],[/shop=mall/,'tržni centar'],[/shop=/,'trgovina'],
+  [/leisure=park/,'park'],[/leisure=playground/,'dječje igralište'],
+  [/leisure=sports_centre/,'sportski centar'],[/leisure=fitness_centre/,'fitnes'],
+  [/leisure=swimming_pool/,'bazen'],[/leisure=stadium/,'stadion'],
+  [/leisure=pitch/,'sportski teren'],[/leisure=garden/,'vrt'],
+  [/tourism=hotel/,'hotel'],[/tourism=hostel/,'hostel'],[/tourism=museum/,'muzej'],
+  [/tourism=gallery/,'galerija'],[/tourism=attraction/,'atrakcija'],
+  [/historic=monument/,'monument'],[/historic=memorial/,'spomen-obilježje'],
+  [/office=government/,'državni ured'],
+  [/building=residential/,'stambena zgrada'],[/building=apartments/,'stambena zgrada'],
+  [/building=commercial/,'poslovna zgrada'],[/building=church/,'crkva'],
+  [/natural=water/,'jezero/rijeka'],[/landuse=park/,'zelena površina'],
+];
+function hrTag(tags){
+  const flat=Object.entries(tags).map(([k,v])=>`${k}=${v}`).join(' ');
+  for(const[re,l]of TYPES)if(re.test(flat))return l;
+  if(tags.amenity)return tags.amenity.replace(/_/g,' ');
+  if(tags.shop)return 'trgovina';
+  if(tags.leisure)return tags.leisure.replace(/_/g,' ');
+  if(tags.tourism)return tags.tourism.replace(/_/g,' ');
+  if(tags.office)return 'ured';
+  return null;
+}
+
+const DLBL={n:'Sjeverno',ne:'Sjeveroistok',e:'Istočno',se:'Jugoistok',s:'Južno',sw:'Jugozapad',w:'Zapadno',nw:'Sjeverozapad'};
+const DFULL={n:'sjeverno',ne:'sjeveroistočno',e:'istočno',se:'jugoistočno',s:'južno',sw:'jugozapadno',w:'zapadno',nw:'sjeverozapadno'};
+
+// ── Main run ──────────────────────────────────────────────────────
+async function run() {
+  closeAc();
+  const raw = addrInput.value.trim();
+  const radius = +document.getElementById('rad').value;
+  if (!raw) return;
+  document.getElementById('out').innerHTML = '';
+  document.getElementById('go').disabled = true;
+
+  try {
+    let la, lo, display_name;
+
+    // Koordinate ili adresa?
+    const coords = parseCoords(raw);
+    if (coords) {
+      la = coords.lat; lo = coords.lon;
+      setSt('Reverse geocoding koordinata…', true);
+      const rr = await fetch('/api/reverse', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ lat: la, lon: lo })
+      });
+      const rd = await rr.json();
+      display_name = rd.display_name || `${la.toFixed(5)}, ${lo.toFixed(5)}`;
+    } else {
+      setSt('Geocodiranje adrese…', true);
+      const gr = await fetch('/api/geocode', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({address: raw})
+      });
+      const gd = await gr.json();
+      if (!gd.length) { setErr('Adresa nije pronađena.'); document.getElementById('go').disabled=false; return; }
+      la = +gd[0].lat; lo = +gd[0].lon; display_name = gd[0].display_name;
+    }
+
+    setSt('Pretraživanje okolice…', true);
+    const q=`[out:json][timeout:30];(node["amenity"](around:${radius},${la},${lo});node["shop"](around:${radius},${la},${lo});node["leisure"](around:${radius},${la},${lo});node["tourism"](around:${radius},${la},${lo});node["historic"](around:${radius},${la},${lo});node["highway"="bus_stop"](around:${radius},${la},${lo});way["building"~"residential|apartments|commercial|church"](around:${radius},${la},${lo});way["leisure"~"park|garden|stadium"](around:${radius},${la},${lo});way["natural"~"water"](around:${radius},${la},${lo}););out center 100;`;
+
+    const or_=await fetch('/api/overpass',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    const od=await or_.json();
+    if(od.error){setErr('Overpass: '+od.error);document.getElementById('go').disabled=false;return;}
+
+    const smap={n:[],ne:[],e:[],se:[],s:[],sw:[],w:[],nw:[]};
+    const seen=new Set();
+    (od.elements||[]).forEach(el=>{
+      const eLa=el.lat??el.center?.lat;
+      const eLo=el.lon??el.center?.lon;
+      if(!eLa||!eLo)return;
+      const type=hrTag(el.tags||{});
+      if(!type)return;
+      const name=el.tags?.name||null;
+      const b=brng(la,lo,eLa,eLo);
+      const d=dst(la,lo,eLa,eLo);
+      const s=sec(b);
+      const k=(name||type)+'_'+s;
+      if(seen.has(k))return;
+      seen.add(k);
+      smap[s].push({name,type,dist:d});
+    });
+    for(const k in smap){smap[k].sort((a,b)=>a.dist-b.dist);smap[k]=smap[k].slice(0,6);}
+
+    const total=Object.values(smap).reduce((s,a)=>s+a.length,0);
+    if(total===0){setErr('Nisu pronađeni objekti. Pokušaj s većim radijusom.');document.getElementById('go').disabled=false;return;}
+
+    setSt('Generiranje AI opisa…',true);
+    const lines=[];
+    for(const[k,items]of Object.entries(smap)){
+      if(items.length){lines.push(DFULL[k].toUpperCase()+':');items.forEach(p=>lines.push(`  - ${p.name?p.name+' ('+p.type+')':p.type}, ${p.dist}m`));}
+    }
+    const prompt=`Adresa: ${display_name}\nRadijus: ${radius}m\n\nObjekti u blizini:\n${lines.join('\n')}\n\nNapiši 3-4 rečenice na hrvatskom koje opisuju što se nalazi u okolici ove adrese. Na početku prirodno spomeni na kojoj se ulici ili raskrižju nalazi. Samo navedi što postoji u blizini — dućani, parkovi, škole, kafići, promet i sl. Bez povijesti, bez detalja, bez cijena. Kratko i informativno.`;
+
+    const cr=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:prompt}]})});
+    const cd=await cr.json();
+    if(cd.error){setErr('Claude: '+cd.error);document.getElementById('go').disabled=false;return;}
+    const desc=cd.content?.[0]?.text||'(bez opisa)';
+
+    setSt('',false);
+    render(display_name,la,lo,smap,desc);
+  } catch(e){
+    setErr(e.message);
+  }
+  document.getElementById('go').disabled=false;
+}
+
+function mkCell(smap,key,cls){
+  const items=smap[key]||[];
+  const list=items.length
+    ?items.map(p=>`<li><span><span class="pn">${p.name||p.type}</span>${p.name?`<br><span class="pt">${p.type}</span>`:''}</span><span class="pd">${p.dist}m</span></li>`).join('')
+    :`<li class="pempty">—</li>`;
+  return`<div class="cc ${cls}"><div class="cdlbl">${DLBL[key]}</div><ul class="pl">${list}</ul></div>`;
+}
+
+function render(address,la,lo,smap,desc){
+  const short=address.split(',').slice(0,3).join(', ');
+  const descHtml=desc.split('\n').filter(Boolean).map(p=>`<p>${p}</p>`).join('');
+  document.getElementById('out').innerHTML=`
+    <div class="pill">📍 ${short}</div>
+    <div class="compass">
+      ${mkCell(smap,'nw','nw')} ${mkCell(smap,'n','n')} ${mkCell(smap,'ne','ne')}
+      ${mkCell(smap,'w','w')}
+      <div class="cc mid">
+        <div class="cdlbl">Lokacija</div>
+        <div class="mid-name">${short.split(',')[0]}</div>
+        <div class="mid-coord">${la.toFixed(4)}, ${lo.toFixed(4)}</div>
+      </div>
+      ${mkCell(smap,'e','e')}
+      ${mkCell(smap,'sw','sw')} ${mkCell(smap,'s','s')} ${mkCell(smap,'se','se')}
+    </div>
+    <div class="desc">
+      <div class="desc-hd">✦ Opis — Claude AI</div>
+      <div class="desc-bd">${descHtml}</div>
+    </div>`;
+}
+</script>
+</body>
+</html>
