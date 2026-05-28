@@ -410,7 +410,7 @@ async function run(){
       la=+gd[0].lat;lo=+gd[0].lon;display_name=gd[0].display_name;
     }
     setSt('Pretraživanje okolice…',true);
-    const q=`[out:json][timeout:30];(node["amenity"](around:${radius},${la},${lo});node["shop"](around:${radius},${la},${lo});node["leisure"](around:${radius},${la},${lo});node["tourism"](around:${radius},${la},${lo});node["historic"](around:${radius},${la},${lo});node["highway"="bus_stop"](around:${radius},${la},${lo});way["building"~"residential|apartments|commercial|church"](around:${radius},${la},${lo});way["leisure"~"park|garden|stadium"](around:${radius},${la},${lo});way["natural"~"water"](around:${radius},${la},${lo}););out center 100;`;
+    const q=`[out:json][timeout:20];(node["amenity"](around:${radius},${la},${lo});node["shop"](around:${radius},${la},${lo});node["leisure"](around:${radius},${la},${lo});node["tourism"](around:${radius},${la},${lo});node["highway"="bus_stop"](around:${radius},${la},${lo});way["leisure"~"park|garden"](around:${radius},${la},${lo}););out center 60;`;
     const or_=await fetch('/api/overpass',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
     const od=await or_.json();
     if(od.error){setErr('Overpass: '+od.error);document.getElementById('go').disabled=false;return;}
