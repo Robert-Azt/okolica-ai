@@ -191,31 +191,52 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # ── Gemini AI ─────────────────────────────────────────────────
     def _gemini_call(self, messages, max_tokens=2000):
-        """Poziva Gemini API i vraća tekst odgovora ili None uz error string."""
+        """Poziva Gemini API i vraca tekst odgovora ili None uz error string."""
         if not GEMINI_API_KEY:
             return None, "GEMINI_API_KEY nije postavljen."
-        # Pretvori OpenAI/Anthropic format poruka u Gemini format
-        parts = []
-        for m in messages:
-            role = "user" if m.get("role") == "user" else "model"
-            parts.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+
+        # Spoji sve user poruke u jedan tekst
+        prompt = "\n\n".join(m.get("content", "") for m in messages if m.get("role") == "user")
+
         body = json.dumps({
-            "contents": parts,
+            "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "maxOutputTokens": max_tokens,
                 "temperature": 0.3,
-            }
+            },
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_HARASSMENT",        "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH",       "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
         }).encode("utf-8")
+
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
         req = urllib.request.Request(url, data=body, method="POST",
             headers={"Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
-                data = json.loads(r.read())
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            return text, None
+                raw = r.read()
+            data = json.loads(raw)
+
+            candidates = data.get("candidates", [])
+            if not candidates:
+                reason = data.get("promptFeedback", {}).get("blockReason", "nepoznat razlog")
+                return None, f"Gemini blokirao odgovor: {reason}"
+
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts:
+                finish = candidates[0].get("finishReason", "")
+                return None, f"Gemini prazan odgovor (finishReason: {finish})"
+
+            return parts[0].get("text", ""), None
+
         except urllib.error.HTTPError as e:
-            return None, f"Gemini greška {e.code}: {e.read().decode()}"
+            err_body = ""
+            try: err_body = e.read().decode()
+            except: pass
+            return None, f"Gemini gre\u0161ka {e.code}: {err_body}"
         except Exception as e:
             return None, str(e)
 
