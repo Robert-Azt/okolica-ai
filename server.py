@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 
 PORT = int(os.environ.get("PORT", 8765))
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 HTML_FILE = os.path.join(os.path.dirname(__file__), "index.html")
 GEN_SCRIPT = os.path.join(os.path.dirname(__file__), "generate_doc.js")
 
@@ -197,73 +197,57 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 print(f"Overpass {ep} failed: {e}", flush=True)
         self.send_json({"error": f"Svi Overpass endpointi nedostupni: {last_err}"}, 500)
 
-    # ── Gemini AI ─────────────────────────────────────────────────
-    def _gemini_call(self, messages, max_tokens=2000):
-        """Poziva Gemini API i vraca tekst odgovora ili None uz error string."""
-        if not GEMINI_API_KEY:
-            return None, "GEMINI_API_KEY nije postavljen."
-
-        # Spoji sve user poruke u jedan tekst
-        prompt = "\n\n".join(m.get("content", "") for m in messages if m.get("role") == "user")
+    # ── OpenRouter AI ─────────────────────────────────────────────
+    def _openrouter_call(self, messages, max_tokens=2000):
+        """Poziva OpenRouter API i vraca tekst odgovora ili None uz error string."""
+        if not OPENROUTER_API_KEY:
+            return None, "OPENROUTER_API_KEY nije postavljen."
 
         body = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "maxOutputTokens": max_tokens,
-                "temperature": 0.3,
-            },
-            "safetySettings": [
-                {"category": "HARM_CATEGORY_HARASSMENT",        "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH",       "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ]
+            "model": "meta-llama/llama-3.3-70b-instruct:free",
+            "max_tokens": max_tokens,
+            "temperature": 0.3,
+            "messages": messages,
         }).encode("utf-8")
 
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-        req = urllib.request.Request(url, data=body, method="POST",
-            headers={"Content-Type": "application/json"})
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/chat/completions",
+            data=body, method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://okolica-ai.onrender.com",
+                "X-Title": "Okolica AI",
+            }
+        )
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
-                raw = r.read()
-            data = json.loads(raw)
-
-            candidates = data.get("candidates", [])
-            if not candidates:
-                reason = data.get("promptFeedback", {}).get("blockReason", "nepoznat razlog")
-                return None, f"Gemini blokirao odgovor: {reason}"
-
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if not parts:
-                finish = candidates[0].get("finishReason", "")
-                return None, f"Gemini prazan odgovor (finishReason: {finish})"
-
-            return parts[0].get("text", ""), None
-
+                data = json.loads(r.read())
+            text = data["choices"][0]["message"]["content"]
+            return text, None
         except urllib.error.HTTPError as e:
             err_body = ""
             try: err_body = e.read().decode()
             except: pass
-            return None, f"Gemini gre\u0161ka {e.code}: {err_body}"
+            return None, f"OpenRouter greska {e.code}: {err_body}"
         except Exception as e:
             return None, str(e)
 
     def _claude(self, payload):
         """Endpoint za kratki opis okolice (kompas prikaz)."""
-        if not GEMINI_API_KEY:
-            self.send_json({"error": "GEMINI_API_KEY nije postavljen."}, 400)
+        if not OPENROUTER_API_KEY:
+            self.send_json({"error": "OPENROUTER_API_KEY nije postavljen."}, 400)
             return
         messages = payload.get("messages", [])
-        text, err = self._gemini_call(messages)
+        text, err = self._openrouter_call(messages)
         if err:
             self.send_json({"error": err}, 500)
             return
-        # Vraćamo u Anthropic-kompatibilnom formatu jer frontend to očekuje
         self.send_json({"content": [{"type": "text", "text": text}]})
 
     # ── Generate Word document ────────────────────────────────────
     def _generate_doc(self, payload):
-        if not GEMINI_API_KEY:
+        if not OPENROUTER_API_KEY:
             self.send_json({"error": "API ključ nije postavljen."}, 400)
             return
 
@@ -406,7 +390,7 @@ Generiraj sadržaj za tablicu 2.11 - Kritične točke i ugroženi prostori u sti
 
         tables = {}
         for key, prompt in prompts.items():
-            text, err = self._gemini_call(
+            text, err = self._openrouter_call(
                 [{"role": "user", "content": prompt}],
                 max_tokens=2000
             )
@@ -463,8 +447,8 @@ Generiraj sadržaj za tablicu 2.11 - Kritične točke i ugroženi prostori u sti
 
 
 if __name__ == "__main__":
-    if not GEMINI_API_KEY:
-        print("UPOZORENJE: GEMINI_API_KEY nije postavljen!")
+    if not OPENROUTER_API_KEY:
+        print("UPOZORENJE: OPENROUTER_API_KEY nije postavljen!")
     if not os.path.exists(GEN_SCRIPT):
         print(f"UPOZORENJE: generate_doc.js nije pronađen na {GEN_SCRIPT}")
     print(f"Server pokrenut na portu {PORT}")
