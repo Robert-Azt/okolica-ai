@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 
 PORT = int(os.environ.get("PORT", 8765))
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 HTML_FILE = os.path.join(os.path.dirname(__file__), "index.html")
 GEN_SCRIPT = os.path.join(os.path.dirname(__file__), "generate_doc.js")
 
@@ -197,65 +197,45 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 print(f"Overpass {ep} failed: {e}", flush=True)
         self.send_json({"error": f"Svi Overpass endpointi nedostupni: {last_err}"}, 500)
 
-    # ── OpenRouter AI ─────────────────────────────────────────────
-    def _openrouter_call(self, messages, max_tokens=2000):
-        """Poziva OpenRouter API i vraca tekst odgovora ili None uz error string."""
-        if not OPENROUTER_API_KEY:
-            return None, "OPENROUTER_API_KEY nije postavljen."
-
-        # Pokusaj vise besplatnih modela redom
-        free_models = [
-            "mistralai/mistral-7b-instruct:free",
-            "meta-llama/llama-3.2-3b-instruct:free",
-            "google/gemma-3-4b-it:free",
-            "meta-llama/llama-3.3-70b-instruct:free",
-        ]
-        last_err = None
-        for model in free_models:
-            body = json.dumps({
-                "model": model,
-                "max_tokens": max_tokens,
-                "temperature": 0.3,
-                "messages": messages,
-            }).encode("utf-8")
-            req = urllib.request.Request(
-                "https://openrouter.ai/api/v1/chat/completions",
-                data=body, method="POST",
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://okolica-ai.onrender.com",
-                    "X-Title": "Okolica AI",
-                }
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=60) as r:
-                    data = json.loads(r.read())
-                if "error" in data:
-                    last_err = data["error"].get("message", "unknown")
-                    print(f"OpenRouter {model} error: {last_err}", flush=True)
-                    continue
-                text = data["choices"][0]["message"]["content"]
-                print(f"OpenRouter ok: {model}", flush=True)
-                return text, None
-            except urllib.error.HTTPError as e:
-                err_body = ""
-                try: err_body = e.read().decode()
-                except: pass
-                last_err = f"{e.code}: {err_body[:100]}"
-                print(f"OpenRouter {model} HTTP error: {last_err}", flush=True)
-            except Exception as e:
-                last_err = str(e)
-                print(f"OpenRouter {model} exception: {e}", flush=True)
-        return None, f"OpenRouter greska: {last_err}"
+    # ── Anthropic Claude ──────────────────────────────────────────
+    def _anthropic_call(self, messages, max_tokens=2000):
+        """Poziva Anthropic API i vraca tekst odgovora ili None uz error string."""
+        if not ANTHROPIC_API_KEY:
+            return None, "ANTHROPIC_API_KEY nije postavljen."
+        body = json.dumps({
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": max_tokens,
+            "messages": messages,
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body, method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+            }
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = json.loads(r.read())
+            text = data["content"][0]["text"]
+            return text, None
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try: err_body = e.read().decode()
+            except: pass
+            return None, f"Anthropic greska {e.code}: {err_body}"
+        except Exception as e:
+            return None, str(e)
 
     def _claude(self, payload):
         """Endpoint za kratki opis okolice (kompas prikaz)."""
-        if not OPENROUTER_API_KEY:
-            self.send_json({"error": "OPENROUTER_API_KEY nije postavljen."}, 400)
+        if not ANTHROPIC_API_KEY:
+            self.send_json({"error": "ANTHROPIC_API_KEY nije postavljen."}, 400)
             return
         messages = payload.get("messages", [])
-        text, err = self._openrouter_call(messages)
+        text, err = self._anthropic_call(messages)
         if err:
             self.send_json({"error": err}, 500)
             return
@@ -263,7 +243,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     # ── Generate Word document ────────────────────────────────────
     def _generate_doc(self, payload):
-        if not OPENROUTER_API_KEY:
+        if not ANTHROPIC_API_KEY:
             self.send_json({"error": "API ključ nije postavljen."}, 400)
             return
 
@@ -406,7 +386,7 @@ Generiraj sadržaj za tablicu 2.11 - Kritične točke i ugroženi prostori u sti
 
         tables = {}
         for key, prompt in prompts.items():
-            text, err = self._openrouter_call(
+            text, err = self._anthropic_call(
                 [{"role": "user", "content": prompt}],
                 max_tokens=2000
             )
@@ -463,8 +443,8 @@ Generiraj sadržaj za tablicu 2.11 - Kritične točke i ugroženi prostori u sti
 
 
 if __name__ == "__main__":
-    if not OPENROUTER_API_KEY:
-        print("UPOZORENJE: OPENROUTER_API_KEY nije postavljen!")
+    if not ANTHROPIC_API_KEY:
+        print("UPOZORENJE: ANTHROPIC_API_KEY nije postavljen!")
     if not os.path.exists(GEN_SCRIPT):
         print(f"UPOZORENJE: generate_doc.js nije pronađen na {GEN_SCRIPT}")
     print(f"Server pokrenut na portu {PORT}")
