@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 
 PORT = int(os.environ.get("PORT", 8765))
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyCDZ5kUYZs_MMBI3IUa1wgU_iQxgasmjWs")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 HTML_FILE = os.path.join(os.path.dirname(__file__), "index.html")
 GEN_SCRIPT = os.path.join(os.path.dirname(__file__), "generate_doc.js")
 
