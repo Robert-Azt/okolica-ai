@@ -203,35 +203,51 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not OPENROUTER_API_KEY:
             return None, "OPENROUTER_API_KEY nije postavljen."
 
-        body = json.dumps({
-            "model": "meta-llama/llama-3.3-70b-instruct:free",
-            "max_tokens": max_tokens,
-            "temperature": 0.3,
-            "messages": messages,
-        }).encode("utf-8")
-
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
-            data=body, method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "HTTP-Referer": "https://okolica-ai.onrender.com",
-                "X-Title": "Okolica AI",
-            }
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                data = json.loads(r.read())
-            text = data["choices"][0]["message"]["content"]
-            return text, None
-        except urllib.error.HTTPError as e:
-            err_body = ""
-            try: err_body = e.read().decode()
-            except: pass
-            return None, f"OpenRouter greska {e.code}: {err_body}"
-        except Exception as e:
-            return None, str(e)
+        # Pokusaj vise besplatnih modela redom
+        free_models = [
+            "mistralai/mistral-7b-instruct:free",
+            "meta-llama/llama-3.2-3b-instruct:free",
+            "google/gemma-3-4b-it:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+        ]
+        last_err = None
+        for model in free_models:
+            body = json.dumps({
+                "model": model,
+                "max_tokens": max_tokens,
+                "temperature": 0.3,
+                "messages": messages,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "https://openrouter.ai/api/v1/chat/completions",
+                data=body, method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "HTTP-Referer": "https://okolica-ai.onrender.com",
+                    "X-Title": "Okolica AI",
+                }
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    data = json.loads(r.read())
+                if "error" in data:
+                    last_err = data["error"].get("message", "unknown")
+                    print(f"OpenRouter {model} error: {last_err}", flush=True)
+                    continue
+                text = data["choices"][0]["message"]["content"]
+                print(f"OpenRouter ok: {model}", flush=True)
+                return text, None
+            except urllib.error.HTTPError as e:
+                err_body = ""
+                try: err_body = e.read().decode()
+                except: pass
+                last_err = f"{e.code}: {err_body[:100]}"
+                print(f"OpenRouter {model} HTTP error: {last_err}", flush=True)
+            except Exception as e:
+                last_err = str(e)
+                print(f"OpenRouter {model} exception: {e}", flush=True)
+        return None, f"OpenRouter greska: {last_err}"
 
     def _claude(self, payload):
         """Endpoint za kratki opis okolice (kompas prikaz)."""
