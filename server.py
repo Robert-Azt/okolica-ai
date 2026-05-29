@@ -203,7 +203,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not ANTHROPIC_API_KEY:
             return None, "ANTHROPIC_API_KEY nije postavljen."
         body = json.dumps({
-            "model": "claude-3-5-sonnet-20241022",
+            "model": "claude-haiku-4-5-20251001",
             "max_tokens": max_tokens,
             "messages": messages,
         }).encode("utf-8")
